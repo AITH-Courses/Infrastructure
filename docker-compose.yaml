@@ -1,0 +1,129 @@
+version: "3.9"
+
+services:
+  fontend:
+    image: daniilsolo/aithc.frontend:latest
+    container_name: nginx_fontend
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - core_backend
+      - image_service
+    
+  core_backend:
+    image: daniilsolo/aithc.core-backend:latest
+    container_name: fastapi_core_backend
+    env_file:
+      - ".env"
+    environment:
+      POSTGRES_HOST: core_db
+      REDIS_HOST: core_cache
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    depends_on:
+      - core_db
+      - core_cache
+
+  image_service:
+    image: daniilsolo/aithc.image-service:latest
+    container_name: golang_image_service
+    env_file:
+      - ".env"
+    environment:
+      MINIO_HOST: imagestorage
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      - imagestorage
+    
+  core_db:
+    image: postgres:14.8-alpine3.18
+    container_name: postgres_core_db
+    environment:
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    env_file: 
+      - ".env"
+    volumes:
+      - core_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  core_cache:
+    image: redis:latest
+    container_name: redis_cache
+    env_file: 
+      - ".env"
+    ports:
+      - "6379:6379"
+    volumes:
+      - core_cache_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    command: >
+      sh -c '
+        mkdir -p /usr/local/etc/redis &&
+        echo "bind 0.0.0.0" > /usr/local/etc/redis/redis.conf &&
+        echo "requirepass $REDIS_PASSWORD" >> /usr/local/etc/redis/redis.conf &&
+        echo "appendonly yes" >> /usr/local/etc/redis/redis.conf &&
+        echo "appendfsync everysec" >> /usr/local/etc/redis/redis.conf &&
+        echo "user default on nopass ~* +@all" > /usr/local/etc/redis/users.acl &&
+        echo "user $REDIS_USER on >$REDIS_USER_PASSWORD ~* +@all" >> /usr/local/etc/redis/users.acl &&
+        redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
+      '
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
+  imagestorage:
+    container_name: minio_s3_storage
+    image: bitnami/minio:latest
+    volumes:
+      - image_storage_data:/bitnami/minio/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    restart: unless-stopped
+    env_file:
+      - ".env"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+      MINIO_USE_SSL: "${MINIO_USE_SSL}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  core_db_data:
+  core_cache_data:
+  image_storage_data:
