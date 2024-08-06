@@ -41,3 +41,8 @@ graph LR
     end
     class Legend frame
 ```
+
+### Запуск
+```bash
+docker compose up -d
+```
