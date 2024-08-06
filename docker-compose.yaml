@@ -21,8 +21,8 @@ services:
     environment:
       POSTGRES_HOST: core_db
       REDIS_HOST: core_cache
-    ports:
-      - "5000:5000"
+#    ports:
+#      - "5000:5000"
     restart: unless-stopped
     depends_on:
       - core_db
@@ -35,8 +35,8 @@ services:
       - ".env"
     environment:
       MINIO_HOST: imagestorage
-    ports:
-      - "8080:8080"
+#    ports:
+#      - "8080:8080"
     restart: unless-stopped
     depends_on:
       - imagestorage
@@ -50,8 +50,8 @@ services:
       - ".env"
     volumes:
       - core_db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+#    ports:
+#      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
       interval: 10s
@@ -70,8 +70,8 @@ services:
     container_name: redis_cache
     env_file: 
       - ".env"
-    ports:
-      - "6379:6379"
+#    ports:
+#      - "6379:6379"
     volumes:
       - core_cache_data:/data
     deploy:
@@ -107,9 +107,9 @@ services:
     image: bitnami/minio:latest
     volumes:
       - image_storage_data:/bitnami/minio/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+#    ports:
+#      - "9000:9000"
+#      - "9001:9001"
     restart: unless-stopped
     env_file:
       - ".env"
