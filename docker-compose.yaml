@@ -7,15 +7,42 @@ services:
     restart: always
     ports:
       - 80:80
+      - 443:443
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
     depends_on:
       - core_backend
+      - core_backend_2
       - image_service
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes: 
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    command: certonly --webroot -w /var/www/certbot --force-renewal --email daniil.solo1723@gmail.com -d aith-courses.ru --agree-tos
     
   core_backend:
     image: daniilsolo/aithc.core-backend:latest
     container_name: fastapi_core_backend
+    env_file:
+      - ".env"
+    environment:
+      POSTGRES_HOST: core_db
+      REDIS_HOST: core_cache
+#    ports:
+#      - "5000:5000"
+    restart: unless-stopped
+    depends_on:
+      - core_db
+      - core_cache
+
+  core_backend_2:
+    image: daniilsolo/aithc.core-backend:latest
+    container_name: fastapi_core_backend_2
     env_file:
       - ".env"
     environment:
